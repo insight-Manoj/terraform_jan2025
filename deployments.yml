@@ -1,0 +1,107 @@
+#Terraform script that combines both modules and resources in a single script. This example creates a VPC using a module and then uses resources to #create an S3 bucket and an EC2 instance within that VPC.
+
+
+provider "aws" {
+	region = "ap-south-1"
+}
+
+#vpc module
+
+module "vpc" {
+	source = terraform-aws-modules/aws/vpc 
+	
+	name = "my_vpc"
+	cidr = "10.0.0.0/16"
+	
+	az = ["us-east-1" "ap-south-1" "eu-wsest-1"]
+	public_subnet = ["10.0.0.1/24" "10.0.0.2/24" "10.0.0.3/24"]
+	private_subnet = ["10.0.101.0/24" "10.0.102.0/24" "10.0.103.0/24"]
+	
+	enable_nat_gateway = "true"
+	
+	tags = {
+		Terraform = "true"
+		Environment = "dev"
+		}
+}
+
+#aws instance EC2
+resource "aws_instance" "web" {
+	ami "0abcdef123456"
+	instance_type " t3.micro"
+	subnet_id = "module.vpc.public_subnets[0]"
+	associate_public_ip_address = "true"
+	key_name ="my-key"
+	
+	tags = {
+		Name = "webserver"
+		Environment = "dev"
+		}
+}
+
+# s3 bucket resource
+resource "aws_s3_bukcket" "backend_s3_bucket" {
+	bucket = "bogus_bucket"
+	acl = "private"
+	
+	
+	tags = {
+		Name = "my_bucket"
+		Environment = "dev"
+	}
+}
+
+#security groups
+
+resource "aws_security_groups" "web_security" {
+	vpc_id = module.vpc.vpcid #reference the vpcid from the module
+	
+	ingress {
+		from_port = "22"
+		to_port = "22"
+		protocol = "tcp"
+		cidr_block = "0.0.0.0/0" # allow ssh form any where
+		
+	}
+	
+	ingeress {
+		form_port = "80"
+		to_port = "80"
+		protocol = "tcp"
+		cidr_block = " 0.0.0.0/0" from http
+	}
+	
+	egress {
+		from_port ="0"
+		to_port = "0"
+		protocol = "-1"
+#The value -1 represents all protocols.
+#This allows any protocol (e.g., TCP, UDP, ICMP, etc.) for the outbound traffic.
+		cidr_block = ["0.0.0.0/0"] #allow all outbound traffic 
+	}
+	
+	tags = {
+		Name = "SG"
+		Environment = "dev"
+	}
+}
+
+
+check this 
+#s3_bucket
+resource "aws_s3_bucket" "example" {
+  bucket = "bogusbucket2025"
+  versioning {
+	enabled = true
+	}
+	
+	server_side_encryption_configuration {
+		rule {
+			apply_server_side_encryption_by_default {
+				sse_algorithm = "AES256"
+			}
+		}
+	}
+	#lifecycle {
+	#	prevent_destroy = true
+	#}
